@@ -38,6 +38,7 @@ const (
 	envoyVersionsURLEnvKey = "ENVOY_VERSIONS_URL"
 	envoyVersionsJSON      = "../site/envoy-versions.json"
 	runTimeout             = 2 * time.Minute
+	windows                = "windows"
 )
 
 var (
@@ -113,6 +114,9 @@ func readGetEnvoyPath() (string, error) {
 	if path == "" {
 		// Assemble the default created by "make bin"
 		relativePath := filepath.Join("..", "dist", fmt.Sprintf("getenvoy_%s_%s", runtime.GOOS, runtime.GOARCH), "getenvoy")
+		if runtime.GOOS == windows {
+			relativePath += ".exe"
+		}
 		abs, err := filepath.Abs(relativePath)
 		if err != nil {
 			return "", fmt.Errorf("%s didn't resolve to a valid path. Correct environment variable %s", path, getenvoyBinaryEnvKey)
@@ -129,7 +133,7 @@ func readGetEnvoyPath() (string, error) {
 	}
 	// While "make bin" should result in correct permissions, double-check as some tools lose them, such as
 	// https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
-	if stat.Mode()&0111 == 0 {
+	if runtime.GOOS != windows && stat.Mode()&0111 == 0 {
 		return "", fmt.Errorf("%s is not executable. Correct environment variable %s", path, getenvoyBinaryEnvKey)
 	}
 	return path, nil

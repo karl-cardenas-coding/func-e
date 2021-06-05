@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
@@ -33,15 +34,23 @@ import (
 	"github.com/tetratelabs/getenvoy/internal/test/morerequire"
 )
 
+// lf ensures line feeds are realistic
+var lf = func() string {
+	if runtime.GOOS == windows {
+		return "\r\n"
+	}
+	return "\n"
+}()
+
 func TestRuntime_Run(t *testing.T) {
 	tempDir, removeTempDir := morerequire.RequireNewTempDir(t)
 	defer removeTempDir()
 
 	runsDir := filepath.Join(tempDir, "runs")
 	runDir := filepath.Join(runsDir, "1619574747231823000") // fake a realistic value
-	adminFlag := fmt.Sprintf("--admin-address-path %s/admin-address.txt", runDir)
+	adminFlag := fmt.Sprint("--admin-address-path ", filepath.Join(runDir, "admin-address.txt"))
 
-	fakeEnvoy := filepath.Join(tempDir, "envoy")
+	fakeEnvoy := filepath.Join(tempDir, "envoy.exe") // use exe even outside windows, as it is simpler
 	test.RequireFakeEnvoy(t, fakeEnvoy)
 
 	tests := []struct {
@@ -56,8 +65,8 @@ func TestRuntime_Run(t *testing.T) {
 			name: "GetEnvoy Ctrl+C",
 			args: []string{"-c", "envoy.yaml"},
 			// Don't warn the user when they exited the process
-			expectedStdout:   fmt.Sprintln("starting:", fakeEnvoy, "-c", "envoy.yaml", adminFlag) + "GET /ready HTTP/1.1\n",
-			expectedStderr:   "initializing epoch 0\nstarting main dispatch loop\ncaught SIGINT\nexiting\n",
+			expectedStdout:   fmt.Sprintln("starting:", fakeEnvoy, "-c", "envoy.yaml", adminFlag) + "GET /ready HTTP/1.1" + lf,
+			expectedStderr:   fmt.Sprintf("initializing epoch 0%[1]sstarting main dispatch loop%[1]scaught SIGINT%[1]sexiting%[1]s", lf),
 			wantShutdownHook: true,
 		},
 		// We don't test envoy dying from an external signal as it isn't reported back to the getenvoy process and
@@ -67,7 +76,7 @@ func TestRuntime_Run(t *testing.T) {
 			shutdown:       func() { time.Sleep(time.Millisecond * 100) },
 			args:           []string{}, // no config file!
 			expectedStdout: fmt.Sprintln("starting:", fakeEnvoy, adminFlag),
-			expectedStderr: "initializing epoch 0\nexiting\nAt least one of --config-path or --config-yaml or Options::configProto() should be non-empty\n",
+			expectedStderr: fmt.Sprintf("initializing epoch 0%[1]sexiting%[1]sAt least one of --config-path or --config-yaml or Options::configProto() should be non-empty%[1]s", lf),
 			expectedErr:    "envoy exited with status: 1",
 		},
 	}
@@ -104,7 +113,7 @@ func TestRuntime_Run(t *testing.T) {
 
 			shutdown := tc.shutdown
 			if shutdown == nil {
-				shutdown = interrupt(r)
+				shutdown = ctrlC(r)
 			}
 
 			// tee the error stream so we can look for the "starting main dispatch loop" line without consuming it.
@@ -144,7 +153,7 @@ func TestRuntime_Run(t *testing.T) {
 	}
 }
 
-func interrupt(r *Runtime) func() {
+func ctrlC(r *Runtime) func() {
 	return func() {
 		fakeInterrupt := r.FakeInterrupt
 		if fakeInterrupt != nil {

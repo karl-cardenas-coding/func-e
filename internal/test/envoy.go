@@ -52,14 +52,14 @@ func RequireRun(t *testing.T, shutdown func(), r Runner, stderr io.Reader, args 
 	reader := bufio.NewReader(stderr)
 	require.Eventually(t, func() bool {
 		b, err := reader.Peek(512)
-		return err != nil && strings.Contains(string(b), "initializing epoch 0\n")
-	}, 2*time.Second, 100*time.Millisecond, "never started process")
+		return err != nil && strings.Contains(string(b), "initializing epoch 0")
+	}, 30*time.Second, 100*time.Millisecond, "never started process")
 
 	shutdown()
 
 	select { // Await run completion
-	case <-time.After(10 * time.Second):
-		t.Fatal("Run never completed")
+	case <-time.After(60 * time.Second):
+		t.Fatalf("Run never completed: %v", stderr)
 	case <-ctx.Done():
 	}
 	return //nolint

@@ -12,19 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build !linux
-
 package moreos
 
 import (
+	"fmt"
 	"os"
 	"syscall"
 )
 
 func processGroupAttr() *syscall.SysProcAttr {
-	return &syscall.SysProcAttr{Setpgid: true}
+	return &syscall.SysProcAttr{
+		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP, // Stop Ctrl-Break propagation to allow shutdown-hooks
+	}
 }
 
 func interrupt(p *os.Process) error {
-	return p.Signal(syscall.SIGINT)
+	pid := p.Pid
+	d, err := syscall.LoadDLL("kernel32.dll")
+	if err != nil {
+		return errorInterrupting(pid, err)
+	}
+	proc, err := d.FindProc("GenerateConsoleCtrlEvent")
+	if err != nil {
+		return errorInterrupting(pid, err)
+	}
+	r, _, err := proc.Call(syscall.CTRL_BREAK_EVENT, uintptr(pid))
+	if r == 0 { // because err != nil on success "The operation completed successfully"
+		return errorInterrupting(pid, err)
+	}
+	return nil
+}
+
+func errorInterrupting(pid int, err error) error {
+	return fmt.Errorf("couldn't Interrupt pid(%d): %w", pid, err)
 }

@@ -52,7 +52,7 @@ func (r *Runtime) Run(ctx context.Context, args []string) (err error) {
 		return err
 	}
 
-	// Print the process line to the console for user knowledge and parsing convenience
+	// Print the process line to the console for user knowledge and scraping
 	fmt.Fprintln(r.Out, "starting:", strings.Join(r.cmd.Args, " ")) //nolint
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("unable to start Envoy process: %w", err)

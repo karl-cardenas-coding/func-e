@@ -20,6 +20,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/tetratelabs/getenvoy/internal/globals"
@@ -27,7 +29,15 @@ import (
 	"github.com/tetratelabs/getenvoy/internal/version"
 )
 
-const binEnvoy = "bin/envoy"
+const windows = "windows"
+
+var binEnvoy = func() string {
+	b := filepath.Join("bin", "envoy")
+	if runtime.GOOS == windows {
+		return b + ".exe"
+	}
+	return b
+}()
 
 // InstallIfNeeded downloads an Envoy binary corresponding to the given version and returns a path to it or an error.
 func InstallIfNeeded(ctx context.Context, o *globals.GlobalOpts, p, v string) (string, error) {
@@ -77,7 +87,7 @@ func verifyEnvoy(installPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if stat.Mode()&0111 == 0 {
+	if !isExecutable(stat) {
 		return "", fmt.Errorf("envoy binary not executable at %q", envoyPath)
 	}
 	return envoyPath, nil
@@ -98,4 +108,8 @@ func untarEnvoy(ctx context.Context, dst, url, p, v string) error { // dst, src 
 		return fmt.Errorf("error untarring %s: %w", url, err)
 	}
 	return nil
+}
+
+func isExecutable(stat os.FileInfo) bool { // In windows, we cannot read execute bit
+	return strings.HasSuffix(stat.Name(), ".exe") || stat.Mode()&0111 == 0
 }

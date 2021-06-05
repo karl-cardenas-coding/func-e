@@ -40,7 +40,11 @@ func TestGetEnvoyUse(t *testing.T) {
 		require.Empty(t, stderr)
 
 		// The binary was installed
-		require.FileExists(t, filepath.Join(homeDir, "versions", version.LastKnownEnvoy, "bin", "envoy"))
+		envoyBin := filepath.Join(homeDir, "versions", version.LastKnownEnvoy, "bin", "envoy")
+		if runtime.GOOS == "windows" {
+			envoyBin += ".exe"
+		}
+		require.FileExists(t, envoyBin)
 
 		// The current version was written
 		f, err := os.ReadFile(filepath.Join(homeDir, "version"))

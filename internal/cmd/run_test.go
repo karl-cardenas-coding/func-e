@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -43,6 +44,14 @@ func (r *runner) Run(ctx context.Context, args []string) error {
 	return r.c.RunContext(ctx, args)
 }
 
+// lf ensures line feeds are realistic
+var lf = func() string {
+	if runtime.GOOS == "windows" {
+		return "\r\n"
+	}
+	return "\n"
+}()
+
 // TestGetEnvoyRun executes envoy then cancels the context. This results in no stdout
 func TestGetEnvoyRun(t *testing.T) {
 	o, cleanup := setupTest(t)
@@ -60,7 +69,7 @@ func TestGetEnvoyRun(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Empty(t, stdout)
-	require.Equal(t, "initializing epoch 0\nstarting main dispatch loop\n", stderr.String())
+	require.Equal(t, fmt.Sprintf("initializing epoch 0%[1]sstarting main dispatch loop%[1]s", lf), stderr.String())
 }
 
 func TestGetEnvoyRun_TeesConsoleToLogs(t *testing.T) {
@@ -95,7 +104,7 @@ func TestGetEnvoyRun_ReadsHomeVersionFile(t *testing.T) {
 	runWithoutConfig(t, c)
 
 	// No implicit lookup
-	require.NotContains(t, o.Out.(*bytes.Buffer).String(), "looking up latest version\n")
+	require.NotContains(t, o.Out.(*bytes.Buffer).String(), "looking up latest version"+lf)
 	require.Equal(t, version.LastKnownEnvoy, o.EnvoyVersion)
 }
 
@@ -112,7 +121,7 @@ func TestGetEnvoyRun_CreatesHomeVersionFile(t *testing.T) {
 	runWithoutConfig(t, c)
 
 	// We logged the implicit lookup
-	require.Contains(t, o.Out.(*bytes.Buffer).String(), "looking up latest version\n")
+	require.Contains(t, o.Out.(*bytes.Buffer).String(), "looking up latest version"+lf)
 	require.FileExists(t, filepath.Join(o.HomeDir, "version"))
 	require.Equal(t, version.LastKnownEnvoy, o.EnvoyVersion)
 }
@@ -167,6 +176,6 @@ func TestGetEnvoyRun_ErrsWhenVersionsServerDown(t *testing.T) {
 	c, _, _ := newApp(o)
 	err := c.Run([]string{"getenvoy", "run"})
 
-	require.Contains(t, o.Out.(*bytes.Buffer).String(), "looking up latest version\n")
+	require.Contains(t, o.Out.(*bytes.Buffer).String(), "looking up latest version"+lf)
 	require.Contains(t, err.Error(), fmt.Sprintf(`couldn't read latest version from %s`, o.EnvoyVersionsURL))
 }

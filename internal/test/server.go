@@ -50,8 +50,9 @@ func RequireEnvoyVersionsTestServer(t *testing.T, v string) *httptest.Server {
 		LatestVersion: v,
 		Versions: map[string]version.EnvoyVersion{ // hard-code date so that tests don't drift
 			v: {ReleaseDate: FakeReleaseDate, Tarballs: map[string]string{
-				"linux/" + runtime.GOARCH:  TarballURL(h.URL, "linux", runtime.GOARCH, v),
-				"darwin/" + runtime.GOARCH: TarballURL(h.URL, "darwin", runtime.GOARCH, v),
+				"linux/" + runtime.GOARCH:   TarballURL(h.URL, "linux", runtime.GOARCH, v),
+				"darwin/" + runtime.GOARCH:  TarballURL(h.URL, "darwin", runtime.GOARCH, v),
+				"windows/" + runtime.GOARCH: TarballURL(h.URL, "windows", runtime.GOARCH, v),
 			}}},
 	}
 	return h
@@ -106,7 +107,11 @@ func requireFakeEnvoyTarGz(t *testing.T, v string) []byte {
 	// construct the platform directory based on the input version
 	installDir := filepath.Join(tempDir, v)
 	require.NoError(t, os.MkdirAll(filepath.Join(installDir, "bin"), 0700)) //nolint:gosec
-	RequireFakeEnvoy(t, filepath.Join(installDir, "bin", "envoy"))
+	bin := "envoy"
+	if runtime.GOOS == "windows" {
+		bin = "envoy.exe"
+	}
+	RequireFakeEnvoy(t, filepath.Join(installDir, "bin", bin))
 
 	// tar.gz the platform dir
 	tempGz := filepath.Join(tempDir, "envoy.tar.gz")
